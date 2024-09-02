@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solana Account Offset Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #181818;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #333;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+        }
+        .account-box {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px;
+            color: #000;
+            background-color: #e5e5e5;
+            border-radius: 5px;
+        }
+
+        
+        .offset {
+            display: block;
+            white-space: pre-wrap;
+        }
+
+
+        .equ {
+            color: #c586c0; /* Purple */
+        }
+
+        .offset-name {
+            color: #d4d4d4; /* Off white */
+        }
+
+        .offset-value {
+            color: #d7ba7d; /* Orange */
+        }
+        .account-name {
+            font-size: 1em;
+        }
+        .offset-container {
+            white-space: pre;
+            font-family: monospace;
+            background-color: #000;
+            padding: 15px 30px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        button {
+            color: #000;
+            background: #fff;
+            border: 0px none;
+            border-radius: 20px;
+            padding: 10px 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>SVM Memory Offset Calculator</h1>
+
+    <div id="accounts-container"></div>
+
+    <button onclick="addAccount()">Add Account</button>
+    <button onclick="generateOffsets('C')">Generate C Offsets</button>
+    <button onclick="generateOffsets('Rust')">Generate Rust Offsets</button>
+    <button onclick="generateOffsets('ASM')">Generate ASM Offsets</button>
+    <div class="offset-container">
+        <code id="offsets" class="offset">
+            Generate some offsets!
+        </code>
+    </div>
+</div>
+
+<script>
+    let accountCount = 0;
+
+    function addAccount() {
+        accountCount++;
+        const container = document.getElementById('accounts-container');
+        const accountBox = document.createElement('div');
+        accountBox.classList.add('account-box');
+        accountBox.innerHTML = `
+            <div class="account-name">#${accountCount}</div>
+            <div>
+                Name: <input type="text" id="name${accountCount}" value="ACCOUNT${accountCount}">
+                Data Length: <input type="number" id="dataLength${accountCount}" value="32" min="1">
+            </div>
+        `;
+        container.appendChild(accountBox);
+    }
+
+    function generateOffsets(value) {
+        let pre = value == "C" ? `<span class="equ">define</span>` : value == "Rust" ? `<span class="equ">const</span>` : `<span class="equ">.equ</span>`
+        let currentOffset = 0x0008;
+        let output = `${pre} <span class="offset-name">NUM_ACCOUNTS</span>, <span class="offset-value">0x0000</span><br>`;
+        const padding = 10240;
+
+        for (let i = 1; i <= accountCount; i++) {
+            const name = document.getElementById(`name${i}`).value.toUpperCase();
+            const dataLength = parseInt(document.getElementById(`dataLength${i}`).value);
+
+            const addOffset = (fieldName, size) => {
+                output += `${pre} <span class="offset-name">${name}_${fieldName}</span>, <span class="offset-value">${'0x' + currentOffset.toString(16).padStart(4, '0')}</span><br>`;
+                currentOffset += size;
+            };
+
+            const align = () => {
+                if (currentOffset % 8 !== 0) {
+                    const alignmentPadding = 8 - (currentOffset % 8);
+                    currentOffset += alignmentPadding;
+                }
+            }
+
+            addOffset('HEADER', 8);
+            addOffset('KEY', 32);
+            addOffset('OWNER', 32);
+            addOffset('LAMPORTS', 8);
+            addOffset('DATA_LEN', 8);
+            addOffset('DATA', dataLength);
+            currentOffset += padding;
+            align()
+        }
+
+        if (currentOffset % 8 !== 0) {
+            const alignmentPadding = 8 - (currentOffset % 8);
+            currentOffset += alignmentPadding;
+        }
+
+        
+        output += `${pre} <span class="offset-name">INSTRUCTION_DATA_LEN</span>, <span class="offset-value">${'0x' + currentOffset.toString(16).padStart(4, '0')}</span><br>`;
+        currentOffset += 8;
+        
+        output += `${pre} <span class="offset-name">INSTRUCTION_DATA</span>, <span class="offset-value">${'0x' + currentOffset.toString(16).padStart(4, '0')}</span><br>`;
+        
+        // Add the program ID and instruction data
+        output += `${pre} <span class="offset-name">PROGRAM_ID</span>, <span class="offset-value">${'0x' + currentOffset.toString(16).padStart(4, '0')}</span><br>`;
+        currentOffset += 32;
+
+        document.getElementById('offsets').innerHTML = output;
+    }
+</script>
+
+</body>
+</html>
